@@ -5,6 +5,9 @@ library(tidyr)
 
 blpConnect()
 
+bdp(c("ESA Index", "SPY US Equity"), c("PX_LAST", "VOLUME"))
+bdh("SPY US Equity", c("PX_LAST", "VOLUME"), start.date=Sys.Date()-31)
+
 # Get option chain for Brent Nov-2025
 chain <- bds("COX5 Comdty", "OPT_CHAIN")
 
@@ -14,9 +17,10 @@ chain$Security <- chain$`Security Description`
 # Regex to pull strike as numeric
 chain$strike <- as.numeric(sub(".* ([0-9.]+) Comdty", "\\1", chain$Security))
 
+sampled <- chain %>% sample_n(5)
 ticker <- sampled$Security[1]
 
-sampled <- chain %>% sample_n(5)
+
 results <- lapply(sampled $Security, function(ticker) {
   df <- tryCatch(
     bdh(ticker,
