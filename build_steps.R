@@ -1,50 +1,69 @@
 library(lubridate)
+library(dplyr)
+library(purrr)
 
-# Fonction pour générer les tickers CO futures (front month + 12 mois)
-get_co_futures <- function(date, n_months = 12, include_front = TRUE) {
-  # Tableau des codes mois
+get_co_futures <- function(date, n_months = 12, include_front = FALSE) {
+  # Ensure date is Date object
+  if (is.character(date)) date <- as.Date(date)
+  
+  # Month codes (Bloomberg convention)
   month_codes <- c("F","G","H","J","K","M","N","Q","U","V","X","Z")
   
-  # Front month = mois du contrat actif pour cette date
-  # (on suppose que le contrat du mois courant expire vers le 15, sinon suivant)
-  if (day(date) > 15) {
-    front_date <- date %m+% months(1)
-  } else {
-    front_date <- date
-  }
+  # Define front month logic
+  # if (day(date) > 15) {
+  #   front_date <- date %m+% months(1)
+  # } else {
+  #   front_date <- date
+  # }
   
-  # Générer une séquence de mois pour front + n_months
-  months_seq <- seq.Date(from = floor_date(front_date, "month"),
-                         by = "1 month",
-                         length.out = n_months + ifelse(include_front, 1, 0))
+  front_date <- date %m+% months(2)
   
-  # Génération des tickers CO futures
+  # Sequence of months for front + n_months
+  months_seq <- seq.Date(
+    from = floor_date(front_date, "month"),
+    by = "1 month",
+    length.out = n_months + ifelse(include_front, 1, 0)
+  )
+  
+  # Generate tickers + horizon info
   tickers <- sapply(months_seq, function(d) {
     m_code <- month_codes[month(d)]
-    y_code <- substr(year(d), 4, 4)  # dernière chiffre de l’année
+    y_code <- substr(year(d), 4, 4)
     paste0("CO", m_code, y_code, " Comdty")
   })
   
-  return(tickers)
+  horizons <- if (include_front) {
+    c("Front", paste0(1:n_months, "M"))
+  } else {
+    paste0(1:n_months, "M")
+  }
+  
+  tibble(
+    ref_date = date,
+    delivery_date = months_seq,
+    horizon = horizons,
+    ticker = tickers
+  )
 }
 
-get_co_futures(date = as.Date("2025-10-09"))
+dates <- seq(as.Date("2025-07-01"), as.Date("2025-10-01"), by = "1 month")
 
-dates <- seq(as.Date("2024-10-01"), as.Date("2025-10-01"), by = "3 months")
-
-futures_by_date <- lapply(dates, get_co_futures)
-
-names(futures_by_date) <- as.character(dates)
-futures_by_date
+futures_table <- map_dfr(dates, get_co_futures)
 
 
-futures_table <- purrr::map_dfr(dates, function(d) {
-  data.frame(
-    date_ref = d,
-    ticker = get_co_futures(d)
-  )
-})
 
-head(futures_table)
+#do a check for current date
+futures_table %>% 
+  filter(ref_date == "2025-10-01")
+bds("CO1 Comdty", "FUT_CHAIN")
+
+
+#Jan 2025 signifie livraison en Jan 2025
+#1 mois de délai de livraison (décembre)
+# donc dernière quotation fin nnovembre ici 29 Nov 2024
+
+
+# futures_table <- futures_table %>%
+#   mutate(PX_LAST = map_dbl(ticker, ~ bdp(.x, "PX_LAST")[[1]]))
 
 
