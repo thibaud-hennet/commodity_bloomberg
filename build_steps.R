@@ -26,7 +26,7 @@ get_co_futures <- function(date, n_months = 12, include_front = FALSE) {
   )
   
   # Generate tickers + horizon info
-  tickers <- sapply(months_seq, function(d) {
+  underlyings <- sapply(months_seq, function(d) {
     m_code <- month_codes[month(d)]
     y_code <- substr(year(d), 4, 4)
     paste0("CO", m_code, y_code, " Comdty")
@@ -42,7 +42,7 @@ get_co_futures <- function(date, n_months = 12, include_front = FALSE) {
     ref_date = date,
     delivery_date = months_seq,
     horizon = horizons,
-    ticker = tickers
+    underlying = underlyings
   )
 }
 

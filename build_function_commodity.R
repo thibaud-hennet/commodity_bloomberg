@@ -122,20 +122,79 @@ price_future_1M_data
 
 dates <- seq(as.Date("2025-07-01"), as.Date("2025-10-01"), by = "1 day")
 
+
 futures_table <- map_dfr(dates, get_co_futures)
-colnames(futures_table)
-colnames(price_future_1M_data)
 
 futures_table_merge <- merge(futures_table,
                              price_future_1M_data %>% 
-                               rename(front_month_pxlast = PX_LAST)
-                               ,
+                               rename(front_month_pxlast = PX_LAST),
                              by.x ="ref_date", by.y ="date"
                              )
+colnames(futures_table_merge)
+
+# get_ticker(underlying, under_px, 
+#            strikes, type = "C",
+#            targets = c(0.8, 0.9, 1, 1.1, 1.2))
+
+#idea but with dedoublement des lignes for each different strike
+# futures_table_merge$ticker <- get_ticker(futures_table_merge$underlying, futures_table_merge$front_month_pxlast, 
+#                                          strikes, type = "C",
+#                                          targets = c(0.8, 0.9, 1, 1.1, 1.2))
+
+futures_table_expanded <- futures_table_merge %>%
+  mutate(
+    tickers = pmap(
+      list(underlying, front_month_pxlast),
+      ~ get_ticker(..1, ..2, strikes, type = "C", targets = c(0.8, 0.9, 1, 1.1, 1.2))
+    )
+  ) %>%
+  unnest_longer(tickers, values_to = "ticker")
+
+futures_table_final <- futures_table_expanded %>%
+  unnest_wider(ticker) %>%          # éclate la liste en colonnes
+  rename(
+    target_moneyness = target_moneyness,
+    strike = strike,
+    ticker = ticker
+  )
 
 
+# ticker <- "COZ5P    112 Comdty"
+# bdh(ticker,
+#     fields = c("PX_LAST","PX_BID", "PX_MID", "PX_ASK"),
+#     start.date = Sys.Date()-2)
+# colnames(futures_table_merge)
+
+futures_prices_fast <- futures_table_merge %>%
+  group_split(ref_date) %>%   # une liste par date
+  map_dfr(~ {
+    date <- unique(.x$ref_date)
+    tickers <- unique(.x$underlying)
+    message("Fetching ", length(tickers), " tickers for date ", date)
+    
+    res <- bdh(
+      tickers,
+      fields = c("PX_LAST","PX_BID","PX_MID","PX_ASK"),
+      start.date = date,
+      end.date = date
+    )
+    
+    # 🧩 Si plusieurs tickers, bdh renvoie une liste → les fusionner
+    res_df <- if (is.list(res) && !is.data.frame(res)) {
+      bind_rows(res, .id = "ticker")  # 'ticker' devient la clé
+    } else {
+      res %>% mutate(ticker = tickers)
+    }
+    
+    res_df %>%
+      mutate(ref_date = date)
+})
 
 
+futures_options_data <- futures_table_final %>%
+  left_join(futures_prices_fast %>% select(-date),
+            by = c("ticker", "ref_date"))
 
-
-
+setwd("C:/Users/B00310412/OneDrive - Association Groupe ESSEC")
+write_parquet(futures_options_data,
+              "initial_test.parquet")
