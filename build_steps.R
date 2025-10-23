@@ -48,7 +48,7 @@ get_co_futures <- function(date, n_months = 12, include_front = FALSE) {
 
 dates <- seq(as.Date("2025-07-01"), as.Date("2025-10-01"), by = "1 month")
 
-futures_table <- map_dfr(dates, get_co_futures)
+futures_table_test <- map_dfr(dates, get_co_futures)
 
 
 

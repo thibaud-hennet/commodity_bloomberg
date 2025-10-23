@@ -8,6 +8,7 @@ library(Rblpapi)
 
 #next lead
 #bdp("CO SEP25 100C VOL BVOL Comdty", "PX_LAST")
+#CO FEB26 90 VOL BVOL Comdty
 
 # 🔧 Fonction helper avec retry et backoff exponentiel
 safe_bdh <- function(tickers, fields, start.date, end.date,

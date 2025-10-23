@@ -1,4 +1,10 @@
+library(purrr)
+library(Rblpapi)
+library(dplyr)
+library(tidyr)
+# Connect to Bloomberg API
 
+blpConnect()
 #CO1C 100 Comdty
 
 
@@ -6,7 +12,7 @@ underlying <- "CO1 Comdty"
 underlying_bis <- "COX5 Comdty"
 
 historical_chain <- bds(underlying, "OPT_CHAIN")
-test_chain <- bds(underlying, "OPT_CHAIN", start.date = Sys.Date() -60)
+#test_chain <- bds(underlying, "OPT_CHAIN", start.date = Sys.Date() -60)
 
 
 # Get option chain for Brent Nov-2025
@@ -162,6 +168,7 @@ price_future_spot_data <- bdh("EUCRBRDT Index", "PX_LAST",
 )
 price_future_spot_data
 
+underlying <- "CO1 Comdty"
 #ici jusqu'en 1988
 price_future_1M_data <- bdh(underlying, "PX_LAST",
                               options=opt_price ,
@@ -171,26 +178,49 @@ price_future_1M_data
 
 
 
-dates <- seq(as.Date("2025-07-01"), as.Date("2025-09-01"), by = "1 monthly")
+dates <- seq(as.Date("2025-07-01"), as.Date("2025-09-01"), by = "1 month")
 
 dates <- seq(as.Date("2025-07-01"), as.Date("2025-09-01"), by = "1 day")
 
 
 futures_table <- map_dfr(dates, get_co_futures)
 
-futures_table_merge <- merge(futures_table %>%
-                               mutate(join_date = delivery_date %m-% months(12)),
-                             price_future_1M_data %>% 
-                               rename(front_month_pxlast_1Yold = PX_LAST),
-                             by.x ="join_date", by.y ="date"
-                             )
 
-futures_table_merge <- merge(futures_table_merge,
+futures_table_merge <- merge(futures_table,
                              price_future_1M_data %>% 
                                rename(front_month_pxlast = PX_LAST) %>% 
                                select(front_month_pxlast, date),
                              by.y ="date", by.x ="ref_date"
 )
+
+# futures_table_merge <- left_join(futures_table %>%
+#                                mutate(join_date = delivery_date %m-% months(12)),
+#                              price_future_1M_data %>% 
+#                                rename(front_month_pxlast_1Yold = PX_LAST),
+#                              by= c("join_date" ="date")
+#                              ) %>% 
+#   arrange(ref_date, delivery_date)
+# 
+# # Function to fill NA with the closest join_date value
+# fill_with_closest <- function(df) {
+#   df %>%
+#     mutate(front_month_pxlast_1Yold = if_else(
+#       is.na(front_month_pxlast_1Yold),
+#       {
+#         # Find join_date difference for available values
+#         diffs <- abs(as.numeric(join_date - df$join_date[!is.na(df$front_month_pxlast_1Yold)]))
+#         closest_index <- which.min(diffs)
+#         df$front_month_pxlast_1Yold[!is.na(df$front_month_pxlast_1Yold)][closest_index]
+#       },
+#       front_month_pxlast_1Yold
+#     ))
+# }
+# # Apply function
+# futures_table_merge <- fill_with_closest(futures_table_merge)
+
+
+
+
 
 colnames(futures_table_merge)
 
@@ -208,7 +238,7 @@ colnames(futures_table_merge)
 futures_table_expanded <- futures_table_merge %>%
   mutate(
     tickers = pmap(
-      list(underlying, front_month_pxlast_1Yold),
+      list(underlying, front_month_pxlast),
       ~ get_ticker_cste_strike(..1, ..2, type = "C", targets = seq(0.7, 1.3, by = 0.1))
     )
   ) %>%
@@ -263,8 +293,10 @@ futures_prices_fast <- futures_table_final %>%
 
 futures_options_data <- futures_table_final %>%
   left_join(futures_prices_fast %>% select(-date),
-            by = c("ticker", "ref_date"))
+            by = c("ticker", "ref_date")) %>% 
+  arrange(ref_date, delivery_date)
 
-setwd("C:/Users/B00310412/OneDrive - Association Groupe ESSEC")
+library(arrow)
+setwd("D:/DATA_bloomberg")
 write_parquet(futures_options_data,
               "initial_test.parquet")

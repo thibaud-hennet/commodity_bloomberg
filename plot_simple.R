@@ -15,14 +15,25 @@ futures_options_data %>%
 
 library(ggplot2)
 colnames(futures_options_data )
+
 plot_data <- futures_options_data %>%
   filter(underlying == "COJ6 Comdty") %>% 
   arrange(ref_date, strike)
-ggplot(
-  data = futures_options_data %>%
-    filter(underlying == "COJ6 Comdty")) +
-  geom_line(aes(x = ref_date, y = PX_LAST, color = factor(target_moneyness), linetype = "Price")) +
-  geom_point(aes(x = ref_date, y = PX_LAST, color = factor(target_moneyness))) +
+
+plot_data_1M <- futures_options_data %>%
+  filter(horizon == "1M") %>% 
+  arrange(ref_date, strike)
+
+plot_data_6M <- futures_options_data %>%
+  filter(horizon == "6M") %>% 
+  arrange(ref_date, strike)
+
+ggplot() +
+  geom_line(
+    data = plot_data_1M, aes(x = ref_date, y = PX_LAST, color = factor(target_moneyness), linetype = "1M")) +
+  geom_point(data = plot_data_1M,aes(x = ref_date, y = PX_LAST, color = factor(target_moneyness))) +
+  geom_line(data = plot_data_6M, aes(x = ref_date, y = PX_LAST, color = factor(target_moneyness), linetype = "6M")) +
+  geom_point(data = plot_data_6M,aes(x = ref_date, y = PX_LAST, color = factor(target_moneyness))) +
   # geom_line(aes(x = ref_date, y = strike, color = factor(target_moneyness), linetype = "Strike")) +
   # geom_point(aes(x = ref_date, y = strike, color = factor(target_moneyness), linetype = "Strike")) +
   labs(
